@@ -42,6 +42,8 @@ type TMXTileset struct {
 	ImageSrc TMXTilesetSrc `xml:"image"`
 	// Image holds the reference of the tileset's TextureResource
 	Image *TextureResource
+	// Properties is a list of custom properties stored in the tmx map
+	Properties TMXProperties `xml:"properties"`
 }
 
 // TMXTileLayer represents a tile layer parsed from the TileMap XML
@@ -56,6 +58,8 @@ type TMXTileLayer struct {
 	TileMapping []uint32
 	// CompData is a temporary list used to fill TileMapping
 	CompData []byte `xml:"data"`
+	// Properties is a list of custom properties stored in the tmx map
+	Properties TMXProperties `xml:"properties"`
 }
 
 // TMXImageLayer represents an image layer parsed from the TileMap XML
@@ -68,6 +72,8 @@ type TMXImageLayer struct {
 	Y float64 `xml:"y,attr"`
 	// ImageSrc contains the TMXImageSrc which defines the image filename
 	ImageSrc TMXImageSrc `xml:"image"`
+	// Properties is a list of custom properties stored in the tmx map
+	Properties TMXProperties `xml:"properties"`
 }
 
 // TMXObjectLayer following the Object Layer naming convention in Tiled
@@ -85,6 +91,8 @@ type TMXObjectLayer struct {
 	// 'opacity' attr only appears in XML if < 1 --> default 1
 	// Visible int         `xml:"visible,attr"`
 	// Opacity float32     `xml:"visible,attr"`
+	// Properties is a list of custom properties stored in the tmx map
+	Properties TMXProperties `xml:"properties"`
 }
 
 // TMXObject represents a TMX object with all default Tiled attributes
@@ -112,6 +120,18 @@ type TMXPolyline struct {
 	// Points contains the original, unaltered points string from the TMZ XML
 	Points string `xml:"points,attr"`
 }
+
+// TMXProperty represents a custom property and its type.
+// Type Can be string (default), int, float, bool, color, or file
+type TMXProperty struct {
+	Type string
+	Value string
+}
+
+// TMXProperties represents a table of custom properties.
+// Can a child of the map, tileset, tile (when part of a tileset), layer, objectgroup, object
+// and imagelayer elements.
+type TMXProperties map[string]TMXProperty
 
 // TMXImageSrc represents the actual image source of an image layer
 type TMXImageSrc struct {
@@ -147,6 +167,8 @@ type TMXLevel struct {
 	ImageLayers []TMXImageLayer `xml:"imagelayer"`
 	// ObjectLayers conatins a list of all parsed TMXObjectLayer objects
 	ObjectLayers []TMXObjectLayer `xml:"objectgroup"`
+	// Properties is a list of custom properties stored in the tmx map
+	Properties TMXProperties `xml:"properties"`
 }
 
 type ByFirstgid []TMXTileset
