@@ -6,6 +6,12 @@ import (
 	"fmt"
 )
 
+// Property
+type Property struct {
+	Type string
+	Value string
+}
+
 // Level is a parsed TMX level containing all layers and default Tiled attributes
 type Level struct {
 	// Orientation is the parsed level orientation from the TMX XML, like orthogonal, isometric, etc.
@@ -20,6 +26,8 @@ type Level struct {
 	RenderOrder string
 	width       int
 	height      int
+	// CanvasOffset transforms the map from 0,0
+	Offset engo.Point
 	// TileWidth defines the width of each tile in the level
 	TileWidth int
 	// TileHeight defines the height of each tile in the level
@@ -32,6 +40,8 @@ type Level struct {
 	ImageLayers []*ImageLayer
 	// ObjectLayers contains all ObjectLayer of the level
 	ObjectLayers []*ObjectLayer
+	// Properties represents properties about this map.
+	Properties map[string]Property
 }
 
 // MapToPosition maps a map coordinate with subtile accuracy and return position
@@ -45,7 +55,12 @@ func (lvl *Level)MapToPosition(mp engo.Point) (*engo.Point, error) {
 			return nil, err
 		}
 	}
-	return lvl.MapToPoint(mp), nil
+	p := lvl.MapToPoint(engo.Point{
+		mp.X - lvl.Offset.X,
+		mp.Y - lvl.Offset.Y})
+	p.X += lvl.Offset.X
+	p.Y += lvl.Offset.Y
+	return p, nil
 }
 
 // PositionToMap maps a screen position coordinate returns a map coordinate with subtile accuracy
@@ -59,7 +74,10 @@ func (lvl *Level)PositionToMap(p engo.Point) (*engo.Point, error) {
 			return nil, err
 		}
 	}
-	return lvl.PointToMap(p), nil
+	m := lvl.PointToMap(p)
+	m.X += lvl.Offset.X
+	m.Y += lvl.Offset.Y
+	return m, nil
 }
 
 
@@ -81,6 +99,7 @@ func (lvl *Level)setupOrientation() error {
 			return
 		}
 		lvl.PointToMap = func(p engo.Point) (m *engo.Point) {
+			m = &engo.Point{}
 			m.X = p.X / tw
 			m.Y = p.Y / th
 			return
@@ -93,6 +112,7 @@ func (lvl *Level)setupOrientation() error {
 			return
 		}
 		lvl.PointToMap = func(p engo.Point) (m *engo.Point) {
+			m = &engo.Point{}
 			m.X = (p.X + p.Y) / tw
 			m.Y = (p.Y - p.X) / th
 			return
@@ -101,7 +121,7 @@ func (lvl *Level)setupOrientation() error {
 		lvl.MapToPoint = func(m engo.Point) (p *engo.Point) {
 			p = &engo.Point{}
 			staggerX := float32(0) // no offset on even rows
-			if int(m.Y)%2 == 1 { // odd row?
+			if int(m.Y)%2 == 1 {   // odd row?
 				staggerX = hw
 			}
 			p.X = (m.X * tw) + staggerX
@@ -112,14 +132,16 @@ func (lvl *Level)setupOrientation() error {
 			m = &engo.Point{}
 			m.Y = p.Y / hh
 			staggerX := float32(0) // no offset on even rows
-			if int(m.Y)%2 == 1 { // odd row?
+			if int(m.Y)%2 == 1 {  // odd row?
 				staggerX = hw
 			}
 			m.X = (p.X - staggerX) / tw
 			return
 		}
 	} else {
-		return fmt.Errorf("Level: Unsupported orientation %v", lvl.Orientation)
+		return fmt.Errorf(
+			"Level: Unsupported orientation %v",
+			lvl.Orientation)
 	}
 	return nil
 }
@@ -135,6 +157,8 @@ type TileLayer struct {
 	Height int
 	// Tiles contains the list of tiles
 	Tiles []*tile
+	// Properties represents properties about this layer
+	Properties map[string]Property
 }
 
 // ImageLayer contains a list of its images plus all default Tiled attributes
@@ -163,6 +187,8 @@ type ObjectLayer struct {
 	Objects []*Object
 	// PolyObjects contains the list of PolylineObject objects
 	PolyObjects []*PolylineObject
+	// Properties represents properties about this objectLayer
+	Properties map[string]Property
 }
 
 // Object is a standard TMX object with all its default Tiled attributes
@@ -181,6 +207,8 @@ type Object struct {
 	Width int
 	// Height is the integer height of the object
 	Height int
+	// Properties represents properties about this object
+	Properties map[string]Property
 }
 
 // PolylineObject is a TMX polyline object with all its default Tiled attributes
@@ -204,10 +232,10 @@ type PolylineObject struct {
 // Bounds returns the level boundaries as an engo.AABB object
 func (l *Level) Bounds() engo.AABB {
 	return engo.AABB{
-		Min: engo.Point{0, 0},
+		Min: l.Offset,
 		Max: engo.Point{
-			float32(l.TileWidth * l.width),
-			float32(l.TileHeight * l.height),
+			float32(l.TileWidth * l.width)   + l.Offset.X,
+			float32(l.TileHeight * l.height) + l.Offset.Y,
 		},
 	}
 }
@@ -250,6 +278,8 @@ func (t *tile) View() (float32, float32, float32, float32) {
 type tile struct {
 	engo.Point
 	Image *Texture
+	// Properties represents properties about this map.
+	Properties map[string]Property
 }
 
 type tilesheet struct {
@@ -264,6 +294,8 @@ type layer struct {
 	Width       int
 	Height      int
 	TileMapping []uint32
+	// Properties represents properties about this layer
+	Properties map[string]Property
 }
 
 func createTileset(lvl *Level, sheets []*tilesheet) []*tile {
@@ -322,18 +354,10 @@ func createLevelTiles(lvl *Level, layers []*layer, ts []*tile) []*TileLayer {
 				if tileIdx := int(mapping[idx]) - 1; tileIdx >= 0 {
 					t.Image = ts[tileIdx].Image
 					tp, _ := lvl.MapToPosition(engo.Point{float32(x), float32(i)})
+
+					tp.X -= t.Image.Width()
+					tp.X -= t.Image.Height()
 					t.Point = *tp
-					/*var px, py float32
-					if lvl.Orientation == "isometric" {
-						px = float32(x - i) * hw
-						py = float32(x + i) * hh
-					} else if lvl.Orientation == "staggered" {
-						px = float32(x * lvl.TileWidth) + hw - staggerX
-						py = float32(i) * hh
-					} else {
-						px = float32(x * lvl.TileWidth)
-						py = float32(i * lvl.TileHeight)
-					} */
 				}
 				tilemap = append(tilemap, t)
 			}
