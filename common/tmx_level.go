@@ -176,7 +176,7 @@ func (t ByFirstgid) Less(i, j int) bool { return t[i].Firstgid < t[j].Firstgid }
 func createLevelFromTmx(tmxBytes []byte, tmxUrl string) (*Level, error) {
 	tmxLevel := &TMXLevel{}
 	level := &Level{}
-	level.Offset = engo.Point{float32(0), float32(0)}
+	level.Offset = engo.Point{X: float32(0), Y: float32(0)}
 
 	if err := xml.Unmarshal(tmxBytes, &tmxLevel); err != nil {
 		return nil, err

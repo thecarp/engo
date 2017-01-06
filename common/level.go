@@ -338,7 +338,7 @@ func createLevelTiles(lvl *Level, layers []*layer, ts []*tile) []*TileLayer {
 		tileLayer := &TileLayer{}
 		mapping := layer.TileMapping
 
-		// Append tiles to map in the order they should be drawn
+		// Append tiles to map
 		for i := 0; i < lvl.height; i++ {
 			for x := 0; x < lvl.width; x++ {
 				idx := x + i*lvl.width
@@ -347,9 +347,9 @@ func createLevelTiles(lvl *Level, layers []*layer, ts []*tile) []*TileLayer {
 				if tileIdx := int(mapping[idx]) - 1; tileIdx >= 0 {
 					t.Image = ts[tileIdx].Image
 					tp, _ := lvl.MapToPosition(engo.Point{float32(x), float32(i)})
-
-					tp.X -= t.Image.Width()
-					tp.X -= t.Image.Height()
+					// Align tiles to bottom for oversize tile layering
+					// XXX: bug for unusual draw orders? configurable?
+					tp.Y -= t.Image.Height() - float32(lvl.TileHeight)
 					t.Point = *tp
 				}
 				tilemap = append(tilemap, t)
