@@ -123,12 +123,13 @@ func (lvl *Level)setupOrientation() error {
 			return m
 		}
 		lvl.PointToMap = func(p *engo.Point) (*engo.Point) {
-			p.Y = p.Y / hh
+			Y := p.Y
+			p.Y = (p.Y - p.X) / th
 			staggerX := float32(0) // no offset on even rows
 			if int(p.Y)%2 == 1 {   // odd row?
 				staggerX = hw
 			}
-			p.X = (p.X - staggerX) / tw
+			p.X = (p.X + Y - staggerX) / tw
 			return p
 		}
 	} else {
