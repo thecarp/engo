@@ -17,10 +17,10 @@ type Level struct {
 	// Orientation is the parsed level orientation from the TMX XML, like orthogonal, isometric, etc.
 	Orientation string
 	// MapToPoint is a pointer to a function which maps map tile coordinates to display points
-	MapToPoint func(engo.Point) (*engo.Point)
+	MapToPoint func(*engo.Point) (*engo.Point)
 	// PointToMap is a pointer to a function which maps display points to map coordinates
 	// return value uses engo.Point rather than int to provide sub-block accuracy.
-	PointToMap func(engo.Point) (*engo.Point)
+	PointToMap func(*engo.Point) (*engo.Point)
 	// suitable for tile printing
 	// RenderOrder is the in Tiled specified TileMap render order, like right-down, right-up, etc.
 	RenderOrder string
@@ -55,12 +55,11 @@ func (lvl *Level)MapToPosition(mp engo.Point) (*engo.Point, error) {
 			return nil, err
 		}
 	}
-	p := lvl.MapToPoint(engo.Point{
-		mp.X - lvl.Offset.X,
-		mp.Y - lvl.Offset.Y})
-	p.X += lvl.Offset.X
-	p.Y += lvl.Offset.Y
-	return p, nil
+	mpc := &engo.Point{mp.X, mp.Y}
+	mpc = lvl.MapToPoint(mpc)
+	mpc.X += lvl.Offset.X
+	mpc.Y += lvl.Offset.Y
+	return mpc, nil
 }
 
 // PositionToMap maps a screen position coordinate returns a map coordinate with subtile accuracy
@@ -74,10 +73,10 @@ func (lvl *Level)PositionToMap(p engo.Point) (*engo.Point, error) {
 			return nil, err
 		}
 	}
-	m := lvl.PointToMap(p)
-	m.X += lvl.Offset.X
-	m.Y += lvl.Offset.Y
-	return m, nil
+	mp := &engo.Point{p.X, p.Y}
+	mp.X -= lvl.Offset.X
+	mp.Y -= lvl.Offset.Y
+	return lvl.PointToMap(mp), nil
 }
 
 
@@ -92,51 +91,45 @@ func (lvl *Level)setupOrientation() error {
 
 	// Do the string comparisons once and setup helper functions
 	if lvl.Orientation == "orthogonal" {
-		lvl.MapToPoint = func(m engo.Point) (p *engo.Point) {
-			p = &engo.Point{}
-			p.X = m.X * tw
-			p.Y = m.Y * th
-			return
+		lvl.MapToPoint = func(m *engo.Point) (*engo.Point) {
+			m.X = m.X * tw
+			m.Y = m.Y * th
+			return m
 		}
-		lvl.PointToMap = func(p engo.Point) (m *engo.Point) {
-			m = &engo.Point{}
-			m.X = p.X / tw
-			m.Y = p.Y / th
-			return
+		lvl.PointToMap = func(p *engo.Point) (*engo.Point) {
+			p.X = p.X / tw
+			p.Y = p.Y / th
+			return p
 		}
 	} else if lvl.Orientation == "isometric" {
-		lvl.MapToPoint = func(m engo.Point) (p *engo.Point) {
-			p = &engo.Point{}
-			p.X = (m.X - m.Y) * hw
-			p.Y = (m.X + m.Y) * hh
-			return
+		lvl.MapToPoint = func(m *engo.Point) (*engo.Point) {
+			m.X = (m.X - m.Y) * hw
+			m.Y = (m.X + m.Y) * hh
+			return m
 		}
-		lvl.PointToMap = func(p engo.Point) (m *engo.Point) {
-			m = &engo.Point{}
-			m.X = (p.X + p.Y) / tw
-			m.Y = (p.Y - p.X) / th
-			return
+		lvl.PointToMap = func(p *engo.Point) (*engo.Point) {
+			p.X = (p.X + p.Y) / tw
+			p.Y = (p.Y - p.X) / th
+			return p
 		}
 	} else if lvl.Orientation == "staggered" {
-		lvl.MapToPoint = func(m engo.Point) (p *engo.Point) {
-			p = &engo.Point{}
+		lvl.MapToPoint = func(m *engo.Point) (*engo.Point) {
 			staggerX := float32(0) // no offset on even rows
 			if int(m.Y)%2 == 1 {   // odd row?
 				staggerX = hw
 			}
-			p.X = (m.X * tw) + staggerX
-			p.Y = m.Y * hh
-			return
+			m.X = (m.X * tw) + staggerX
+			m.Y = m.Y * hh
+			return m
 		}
-		lvl.PointToMap = func(p engo.Point) (m *engo.Point) {
-			m = &engo.Point{}
-			m.Y = p.Y / hh
+		lvl.PointToMap = func(p *engo.Point) (*engo.Point) {
+			p.Y = p.Y / hh
 			staggerX := float32(0) // no offset on even rows
-			if int(m.Y)%2 == 1 {  // odd row?
+			if int(p.Y)%2 == 1 {   // odd row?
 				staggerX = hw
 			}
-			m.X = (p.X - staggerX) / tw
-			return
+			p.X = (p.X - staggerX) / tw
+			return p
 		}
 	} else {
 		return fmt.Errorf(
