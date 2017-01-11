@@ -1,11 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.0" orientation="staggered" renderorder="right-down" width="16" height="24" tilewidth="126" tileheight="62" backgroundcolor="#00ffff">
+<map version="1.0" orientation="staggered" renderorder="right-down" width="8" height="22" tilewidth="126" tileheight="62" backgroundcolor="#00ffff">
+ <properties>
+  <property name="cust1" value="TestVal"/>
+ </properties>
  <tileset firstgid="1" name="tile" tilewidth="128" tileheight="256">
   <image source="tile.png" width="1408" height="256"/>
+  <tile id="4">
+   <properties>
+    <property name="walkable" value="true"/>
+   </properties>
+  </tile>
  </tileset>
- <layer name="Tile Layer 1" width="16" height="24">
+ <layer name="Tile Layer 1" width="8" height="22">
   <data encoding="base64" compression="zlib">
-   eJxjZWBgYKUC5gRiDgr1s5JpBicSm1L9pJqBrpca+sn1ByEzsWFuGuhnA2IuCs0gVz8LmWHGjWQvM5n6uUgMO0rjjpp6R+0eGLsHGgMAfTwIDQ==
+   eJxjZWBgYCUCcwIxBwF5VhxqOJHYhOTR1aDLESOPyx5kPQxQNjcONYwE5NmQ2LjUMGGRZ8GhFqaGC4iZcchz4fEvofAgJDdU9QIAaIcD4w==
   </data>
  </layer>
 </map>
