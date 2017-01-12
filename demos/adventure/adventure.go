@@ -46,6 +46,7 @@ type Hero struct {
 	common.SpaceComponent
 	ControlComponent
 	SpeedComponent
+	MapComponent
 }
 
 type ControlComponent struct {
@@ -158,6 +159,8 @@ func (scene *DefaultScene) Setup(w *ecs.World) {
 		engo.Point{engo.CanvasWidth() / 2, engo.CanvasHeight() / 2},
 		spriteSheet,
 	)
+	hero.MapComponenet.level = levelData
+	hero.MapComponenet.layer = 0
 
 	hero.ControlComponent = ControlComponent{
 		SchemeHoriz: "horizontal",
@@ -196,6 +199,7 @@ func (scene *DefaultScene) Setup(w *ecs.World) {
 				&hero.BasicEntity,
 				&hero.SpeedComponent,
 				&hero.SpaceComponent,
+				&hero.MapComponent,
 			)
 		}
 	}
@@ -321,6 +325,8 @@ func (*DefaultScene) CreateHero(point engo.Point, spriteSheet *common.Spriteshee
 	hero.AnimationComponent.AddAnimations(actions)
 	hero.AnimationComponent.SelectAnimationByName("downstop")
 
+	hero.MapComponent = MapComponent{}
+
 	return hero
 }
 
@@ -337,10 +343,16 @@ type SpeedComponent struct {
 	engo.Point
 }
 
+type MapComponent struct {
+	*engo.Level
+	layer int
+}
+
 type speedEntity struct {
 	*ecs.BasicEntity
 	*SpeedComponent
 	*common.SpaceComponent
+	*MapComponent
 }
 
 type SpeedSystem struct {
@@ -381,9 +393,21 @@ func (s *SpeedSystem) Remove(basic ecs.BasicEntity) {
 func (s *SpeedSystem) Update(dt float32) {
 
 	for _, e := range s.entities {
-		speed := engo.GameWidth() * dt
-		e.SpaceComponent.Position.X = e.SpaceComponent.Position.X + speed*e.SpeedComponent.Point.X
-		e.SpaceComponent.Position.Y = e.SpaceComponent.Position.Y + speed*e.SpeedComponent.Point.Y
+		scale := float32(0) * dt
+		nextP := engo.Point{e.SpeedComponent.X, e.SpeedComponent.Y}
+		nextP.MultiplyScalar(scale)
+		nextP.Add(e.SpaceComponent.Position)
+		layer := e.MapComponent.Layer
+		log.Printf("layer: %v\n", layer)
+		tile := e.MapComponent.Level.TileLayer[layer]
+		if tile.IsWalkable() {
+			log.Println("Next tile walkable: %v\n", nextP)
+			e.SpaceComponent.Position.Set(nextP.X, nextP.Y)
+		} else {
+			e.SpeedComponent.X = float32(0)
+			e.SpeedComponent.Y = float32(0)
+			log.Printf("Next tile not walkable: %v\n", nextP)
+		}
 
 		// Add Game Border Limits
 		var heightLimit float32 = levelHeight - e.SpaceComponent.Height

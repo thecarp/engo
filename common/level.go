@@ -6,12 +6,6 @@ import (
 	"fmt"
 )
 
-// Property
-type Property struct {
-	Type string
-	Value string
-}
-
 // Level is a parsed TMX level containing all layers and default Tiled attributes
 type Level struct {
 	// Orientation is the parsed level orientation from the TMX XML, like orthogonal, isometric, etc.
@@ -21,7 +15,8 @@ type Level struct {
 	// PointToMap is a pointer to a function which maps display points to map coordinates
 	// return value uses engo.Point rather than int to provide sub-block accuracy.
 	PointToMap func(*engo.Point) (*engo.Point)
-	// suitable for tile printing
+	// Return the value of the Max bounds point of the map before offset
+	MapMaxBounds func() (*engo.Point)
 	// RenderOrder is the in Tiled specified TileMap render order, like right-down, right-up, etc.
 	RenderOrder string
 	width       int
@@ -79,6 +74,12 @@ func (lvl *Level)PositionToMap(p engo.Point) (*engo.Point, error) {
 	return lvl.PointToMap(mp), nil
 }
 
+func (l *TileLayer)GetTile(p *engo.Point) (*tile) {
+	mp, _ := l.Level.PositionToMap(*p)
+	tidx := int(mp.X) + int(mp.Y)*l.width
+	return l.Tiles[tidx]
+}
+
 
 // setupOrientation is a function to setup defualt helper functions based on the
 // level orientation as defined by tmx.
@@ -101,6 +102,12 @@ func (lvl *Level)setupOrientation() error {
 			p.Y = p.Y / th
 			return p
 		}
+		lvl.MapMaxBounds = func() (*engo.Point) {
+			return &engo.Point{
+				float32(lvl.TileWidth * lvl.width),
+				float32(lvl.TileHeight * lvl.height),
+			}
+		}
 	} else if lvl.Orientation == "isometric" {
 		lvl.MapToPoint = func(m *engo.Point) (*engo.Point) {
 			m.X = (m.X - m.Y) * hw
@@ -111,6 +118,12 @@ func (lvl *Level)setupOrientation() error {
 			p.X = (p.X + p.Y) / tw
 			p.Y = (p.Y - p.X) / th
 			return p
+		}
+		lvl.MapMaxBounds = func() (*engo.Point) {
+			return &engo.Point{
+				float32(lvl.TileWidth * lvl.width) + float32(lvl.TileWidth/2),
+				float32(lvl.TileHeight/2 * lvl.height) + float32(lvl.TileHeight/2),
+			}
 		}
 	} else if lvl.Orientation == "staggered" {
 		lvl.MapToPoint = func(m *engo.Point) (*engo.Point) {
@@ -132,6 +145,12 @@ func (lvl *Level)setupOrientation() error {
 			p.X = (p.X + Y - staggerX) / tw
 			return p
 		}
+		lvl.MapMaxBounds = func() (*engo.Point) {
+			return &engo.Point{
+				float32(lvl.TileWidth * lvl.width) + float32(lvl.TileWidth/2),
+				float32(lvl.TileHeight/2 * lvl.height) + float32(lvl.TileHeight/2),
+			}
+		}
 	} else {
 		return fmt.Errorf(
 			"Level: Unsupported orientation %v",
@@ -151,7 +170,9 @@ type TileLayer struct {
 	Height int
 	// Tiles contains the list of tiles
 	Tiles []*tile
-	// Properties represents properties about this layer
+	// Level contains a link back to the level we are part of for
+	*Level
+	// Properties represents properties about this objectLayer
 	Properties map[string]Property
 }
 
@@ -225,12 +246,11 @@ type PolylineObject struct {
 
 // Bounds returns the level boundaries as an engo.AABB object
 func (l *Level) Bounds() engo.AABB {
+	max := l.MapMaxBounds()
+	max.Add(l.Offset)
 	return engo.AABB{
 		Min: l.Offset,
-		Max: engo.Point{
-			float32(l.TileWidth * l.width)   + l.Offset.X,
-			float32(l.TileHeight * l.height) + l.Offset.Y,
-		},
+		Max: *max,
 	}
 }
 
@@ -269,6 +289,14 @@ func (t *tile) View() (float32, float32, float32, float32) {
 	return t.Image.View()
 }
 
+func (t *tile) IsWalkable() bool {
+	p, ok := t.Properties["walkable"]
+	if ok && p.Value == "true" {
+		return true
+	}
+	return false
+}
+
 type tile struct {
 	engo.Point
 	Image *Texture
@@ -276,11 +304,17 @@ type tile struct {
 	Properties map[string]Property
 }
 
+type Property struct {
+	Type  string
+	Value string
+}
+
 type tilesheet struct {
 	Image    *TextureResource
 	TileWidth int
 	TileHeight int
 	Firstgid int
+	Properties map[string]Property
 }
 
 type layer struct {
@@ -361,6 +395,7 @@ func createLevelTiles(lvl *Level, layers []*layer, ts []*tile) []*TileLayer {
 		tileLayer.Width = layer.Width
 		tileLayer.Height = layer.Height
 		tileLayer.Tiles = tilemap
+		tileLayer.Level = lvl
 
 		levelTileLayers = append(levelTileLayers, tileLayer)
 	}

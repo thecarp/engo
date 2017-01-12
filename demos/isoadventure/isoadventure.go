@@ -46,6 +46,7 @@ type Hero struct {
 	common.SpaceComponent
 	ControlComponent
 	SpeedComponent
+	MapComponent
 }
 
 type ControlComponent struct {
@@ -155,9 +156,12 @@ func (scene *DefaultScene) Setup(w *ecs.World) {
 	spriteSheet := common.NewSpritesheetFromFile(model, width, height)
 
 	hero := scene.CreateHero(
-		engo.Point{engo.CanvasWidth() / 2, engo.CanvasHeight() / 2},
+		engo.Point{float32(60), float32(60)},
 		spriteSheet,
 	)
+
+	hero.MapComponent.Level = levelData
+	hero.MapComponent.Layer = 0
 
 	hero.ControlComponent = ControlComponent{
 		SchemeHoriz: "horizontal",
@@ -197,6 +201,7 @@ func (scene *DefaultScene) Setup(w *ecs.World) {
 				&hero.SpeedComponent,
 				&hero.SpaceComponent,
 				&hero.RenderComponent,
+				&hero.MapComponent,
 			)
 		}
 	}
@@ -322,6 +327,7 @@ func (*DefaultScene) CreateHero(point engo.Point, spriteSheet *common.Spriteshee
 	}
 
 	hero.SpeedComponent = SpeedComponent{}
+	hero.MapComponent = MapComponent{}
 	hero.AnimationComponent = common.NewAnimationComponent(spriteSheet.Drawables(), 0.1)
 
 	hero.AnimationComponent.AddAnimations(actions)
@@ -343,11 +349,17 @@ type SpeedComponent struct {
 	engo.Point
 }
 
+type MapComponent struct {
+	*common.Level
+	Layer int
+}
+
 type speedEntity struct {
 	*ecs.BasicEntity
 	*SpeedComponent
 	*common.SpaceComponent
 	*common.RenderComponent
+	*MapComponent
 }
 
 type SpeedSystem struct {
@@ -368,8 +380,8 @@ func (s *SpeedSystem) New(*ecs.World) {
 	})
 }
 
-func (s *SpeedSystem) Add(basic *ecs.BasicEntity, speed *SpeedComponent, space *common.SpaceComponent, render *common.RenderComponent) {
-	s.entities = append(s.entities, speedEntity{basic, speed, space, render})
+func (s *SpeedSystem) Add(basic *ecs.BasicEntity, speed *SpeedComponent, space *common.SpaceComponent, render *common.RenderComponent, level *MapComponent) {
+	s.entities = append(s.entities, speedEntity{basic, speed, space, render, level})
 }
 
 func (s *SpeedSystem) Remove(basic ecs.BasicEntity) {
@@ -395,7 +407,14 @@ func (s *SpeedSystem) Update(dt float32) {
 		nextP := &engo.Point{0,0}
 		nextP.Add(e.SpaceComponent.Position)
 		nextP.Add(*delta)
-		e.SpaceComponent.Position.Set(nextP.X, nextP.Y)
+
+		layer := e.MapComponent.Layer
+		tile := e.MapComponent.Level.TileLayers[layer].GetTile(nextP)
+		if tile.IsWalkable() {
+			e.SpaceComponent.Position.Set(nextP.X, nextP.Y)
+		} else {
+			log.Printf("Tile is not walkable: %v", nextP)
+		}
 		eh := e.RenderComponent.Drawable.Height()
 
 		// Add Game Border Limits

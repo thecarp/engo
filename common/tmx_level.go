@@ -16,6 +16,24 @@ import (
 	"engo.io/engo"
 )
 
+// TMXProperty is used to store custom properties about objects
+type TMXProperty struct {
+	Name string `xml:name`
+	Type string `xml:Type`
+	Value string `xml:value`
+}
+
+// TMXProperties is an array of TMXProperty structs as found in TMX files
+type TMXProperties []TMXProperty
+
+func (tmx TMXProperties) Map() (map[string]Property) {
+	out := make(map[string]Property)
+	for _, p := range tmx {
+		out[p.Name] = Property{ Type: p.Type, Value: p.Value }
+	}
+	return out
+}
+
 // TMXTilesetSrc is just used to create levelTileset->Image
 type TMXTilesetSrc struct {
 	// Source holds the URI of the tileset image
@@ -24,6 +42,14 @@ type TMXTilesetSrc struct {
 	Width int `xml:"width,attr"`
 	// Height of each tile in the tileset image
 	Height int `xml:"height,attr"`
+}
+
+type TMXTileSetTile struct {
+	// id is the first assigned gid of the tileset
+	Id int `xml:"id,attr"`
+	// Properties is a list of custom properties stored in the tmx map
+	Properties TMXProperties `xml:"properties"`
+
 }
 
 // TMXTileset contains the tileset resource parsed from the TileMap XML
@@ -43,7 +69,7 @@ type TMXTileset struct {
 	// Image holds the reference of the tileset's TextureResource
 	Image *TextureResource
 	// Properties is a list of custom properties stored in the tmx map
-	Properties map[string]Property `xml:"properties"`
+	Properties TMXProperties `xml:"properties"`
 }
 
 // TMXTileLayer represents a tile layer parsed from the TileMap XML
@@ -59,7 +85,7 @@ type TMXTileLayer struct {
 	// CompData is a temporary list used to fill TileMapping
 	CompData []byte `xml:"data"`
 	// Properties is a list of custom properties stored in the tmx map
-	Properties map[string]Property `xml:"properties"`
+	Properties TMXProperties `xml:"properties"`
 }
 
 // TMXImageLayer represents an image layer parsed from the TileMap XML
@@ -73,7 +99,7 @@ type TMXImageLayer struct {
 	// ImageSrc contains the TMXImageSrc which defines the image filename
 	ImageSrc TMXImageSrc `xml:"image"`
 	// Properties is a list of custom properties stored in the tmx map
-	Properties map[string]Property `xml:"properties"`
+	Properties TMXProperties `xml:"properties"`
 }
 
 // TMXObjectLayer following the Object Layer naming convention in Tiled
@@ -92,7 +118,7 @@ type TMXObjectLayer struct {
 	// Visible int         `xml:"visible,attr"`
 	// Opacity float32     `xml:"visible,attr"`
 	// Properties is a list of custom properties stored in the tmx map
-	Properties map[string]Property `xml:"properties"`
+	Properties TMXProperties `xml:"properties"`
 }
 
 // TMXObject represents a TMX object with all default Tiled attributes
@@ -114,7 +140,7 @@ type TMXObject struct {
 	// Polyline contains the TMXPolyline object if the parsed object has a polyline points string
 	Polyline TMXPolyline `xml:"polyline"`
 	// Properties is a list of custom properties stored in the tmx map
-	Properties map[string]Property `xml:"properties"`
+	Properties TMXProperties `xml:"properties"`
 }
 
 // TMXPolyline represents a TMX Polyline object with its Points values
@@ -158,7 +184,7 @@ type TMXLevel struct {
 	// ObjectLayers conatins a list of all parsed TMXObjectLayer objects
 	ObjectLayers []TMXObjectLayer `xml:"objectgroup"`
 	// Properties is a list of custom properties stored in the tmx map
-	Properties map[string]Property `xml:"properties"`
+	Properties TMXProperties `xml:"properties"`
 }
 
 type ByFirstgid []TMXTileset
@@ -249,7 +275,7 @@ func createLevelFromTmx(tmxBytes []byte, tmxUrl string) (*Level, error) {
 	sort.Sort(ByFirstgid(tmxLevel.Tilesets))
 	ts := make([]*tilesheet, len(tmxLevel.Tilesets))
 	for i, tts := range tmxLevel.Tilesets {
-		ts[i] = &tilesheet{tts.Image, tts.TileWidth, tts.TileHeight, tts.Firstgid}
+		ts[i] = &tilesheet{tts.Image, tts.TileWidth, tts.TileHeight, tts.Firstgid, tts.Properties.Map()}
 	}
 
 	levelTileset := createTileset(level, ts)
@@ -262,7 +288,7 @@ func createLevelFromTmx(tmxBytes []byte, tmxUrl string) (*Level, error) {
 			tileLayer.Width,
 			tileLayer.Height,
 			tileLayer.TileMapping,
-			tileLayer.Properties,
+			tileLayer.Properties.Map(),
 		}
 	}
 
@@ -275,7 +301,7 @@ func createLevelFromTmx(tmxBytes []byte, tmxUrl string) (*Level, error) {
 			Name:    objectLayer.Name,
 			OffSetX: objectLayer.OffSetX,
 			OffSetY: objectLayer.OffSetY,
-			Properties: objectLayer.Properties,
+			Properties: objectLayer.Properties.Map(),
 		}
 
 		// check all objects in layer
@@ -314,7 +340,7 @@ func createLevelFromTmx(tmxBytes []byte, tmxUrl string) (*Level, error) {
 					tmxObject.Y,
 					tmxObject.Width,
 					tmxObject.Height,
-					tmxObject.Properties,
+					tmxObject.Properties.Map(),
 				}
 
 				levelObjectLayer.Objects = append(levelObjectLayer.Objects, object)
@@ -349,7 +375,7 @@ func createLevelFromTmx(tmxBytes []byte, tmxUrl string) (*Level, error) {
 		imageTile := &tile{
 			engo.Point{float32(tmxImageLayer.X), float32(tmxImageLayer.Y)},
 			curImg,
-			tmxImageLayer.Properties,
+			tmxImageLayer.Properties.Map(),
 		}
 
 		imageLayer.Images = append(imageLayer.Images, imageTile)
