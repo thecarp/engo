@@ -34,7 +34,7 @@ var (
 
 const (
 	SPEED_MESSAGE = "SpeedMessage"
-	SPEED_SCALE   = 4
+	SPEED_SCALE   = 2
 )
 
 type DefaultScene struct{}
@@ -156,7 +156,7 @@ func (scene *DefaultScene) Setup(w *ecs.World) {
 	spriteSheet := common.NewSpritesheetFromFile(model, width, height)
 
 	hero := scene.CreateHero(
-		engo.Point{float32(60), float32(60)},
+		engo.Point{float32(300), float32(300)},
 		spriteSheet,
 	)
 
@@ -405,22 +405,30 @@ func (s *SpeedSystem) Update(dt float32) {
 		delta.Add(e.SpeedComponent.Point)
 		delta.MultiplyScalar(speed)
 		nextP := &engo.Point{0,0}
+		eh := e.RenderComponent.Drawable.Height()
 		nextP.Add(e.SpaceComponent.Position)
 		nextP.Add(*delta)
 
 		layer := e.MapComponent.Layer
-		tile := e.MapComponent.Level.TileLayers[layer].GetTile(nextP)
-		if tile.IsWalkable() {
+		log.Printf("Next point is: %v", nextP)
+		floorP := &engo.Point{nextP.X, nextP.Y}
+		floorP.Y += eh
+		log.Printf("Floor point is: %v", floorP)
+
+		mp, _ := e.MapComponent.Level.TileLayers[layer].PositionToMap(*floorP)
+		log.Printf("Map point is: %v", mp)
+
+		tile := e.MapComponent.Level.TileLayers[layer].GetTile(floorP)
+		if  tile != nil && ! tile.IsWalkable() {
 			e.SpaceComponent.Position.Set(nextP.X, nextP.Y)
 		} else {
 			log.Printf("Tile is not walkable: %v", nextP)
 		}
-		eh := e.RenderComponent.Drawable.Height()
 
 		// Add Game Border Limits
 		var heightLimit float32 = levelHeight - e.SpaceComponent.Height
-		if e.SpaceComponent.Position.Y < 0 {
-			e.SpaceComponent.Position.Y = 0
+		if e.SpaceComponent.Position.Y < 0  {
+			e.SpaceComponent.Position.Y = 0 
 		} else if e.SpaceComponent.Position.Y > heightLimit {
 			e.SpaceComponent.Position.Y = heightLimit
 		}

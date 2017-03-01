@@ -3,6 +3,7 @@ package common
 import (
 	"engo.io/engo"
 	"engo.io/gl"
+	"math"
 	"fmt"
 )
 
@@ -74,9 +75,14 @@ func (lvl *Level)PositionToMap(p engo.Point) (*engo.Point, error) {
 	return lvl.PointToMap(mp), nil
 }
 
+// GetTile takes a map coordinate point and gets the associated tile from the array
+// of tiles. It returns nil if tile values are negative or out of range.
 func (l *TileLayer)GetTile(p *engo.Point) (*tile) {
 	mp, _ := l.Level.PositionToMap(*p)
 	tidx := int(mp.X) + int(mp.Y)*l.width
+	if mp.X < 0 || tidx < 0 || tidx > len(l.Tiles) - 1 {
+		return nil
+	}
 	return l.Tiles[tidx]
 }
 
@@ -136,13 +142,32 @@ func (lvl *Level)setupOrientation() error {
 			return m
 		}
 		lvl.PointToMap = func(p *engo.Point) (*engo.Point) {
-			Y := p.Y
-			p.Y = (p.Y - p.X) / th
-			staggerX := float32(0) // no offset on even rows
-			if int(p.Y)%2 == 1 {   // odd row?
-				staggerX = hw
+			floor32 := func (f float32) float32 {
+				return float32(math.Floor(float64(f)))
 			}
-			p.X = (p.X + Y - staggerX) / tw
+			abs32 := func (f float32) float32 {
+				return float32(math.Abs(float64(f)))
+			}
+
+			X := p.X
+			Y := p.Y
+
+			centX := ( floor32(p.X / tw ) * tw)  + hw
+			centY := ( floor32(p.Y / th ) * th ) + hh
+
+			dx := abs32(p.X - centX)
+			dy := abs32(p.Y - centY)
+
+			if (dx / hw) + (dy / hh) <= 1 {
+				// inside - Even!
+				p.X  = floor32((X + tw) / tw) - float32(1)
+				p.Y = floor32((Y + th) / th) - float32(1)
+			} else {
+				// Outside - odd!
+				p.X = floor32((X + hw) / tw) - float32(1)
+				p.Y = floor32((Y + hh) / th) - float32(1)
+			}
+
 			return p
 		}
 		lvl.MapMaxBounds = func() (*engo.Point) {
