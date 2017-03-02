@@ -426,9 +426,9 @@ func (s *SpeedSystem) Update(dt float32) {
 		}
 
 		// Add Game Border Limits
-		var heightLimit float32 = levelHeight - e.SpaceComponent.Height
-		if e.SpaceComponent.Position.Y < 0  {
-			e.SpaceComponent.Position.Y = 0 
+		var heightLimit float32 = levelHeight - eh
+		if e.SpaceComponent.Position.Y < 0 - eh  {
+			e.SpaceComponent.Position.Y = 0 - eh
 		} else if e.SpaceComponent.Position.Y > heightLimit {
 			e.SpaceComponent.Position.Y = heightLimit
 		}
