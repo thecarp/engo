@@ -18,6 +18,11 @@ type FileLoader interface {
 	Resource(url string) (Resource, error)
 }
 
+type DataLoader interface {
+	// Insert loads a given resource from its already in memory data
+	Insert(url string, data interface{}) error
+}
+
 // Resource represents a game resource, such as an image or a sound.
 type Resource interface {
 	// URL returns the uniform resource locator of the given resource.
@@ -53,6 +58,19 @@ func (formats *Formats) Register(ext string, loader FileLoader) {
 	formats.formats[ext] = loader
 }
 
+// insert finds the appropriate file loader and calls its Insert reciever if it supports the DataLoader iface
+func (formats *Formats) insert(url string, data interface{}) error {
+	ext := filepath.Ext(url)
+	if loader, ok := Files.formats[ext]; ok {
+		// Found the loader, does it support insert?
+		if l, ok := loader.(DataLoader); ok {
+			return l.Insert(url, data)
+		}
+		return fmt.Errorf("Loader for %q does not support the DataLoader interface.", ext)
+	}
+	return fmt.Errorf("insert: no `FileLoader` associated with this extension: %q in url %q", ext, url)
+}
+
 // load loads the given resource into memory.
 func (formats *Formats) load(url string) error {
 	ext := filepath.Ext(url)
@@ -66,6 +84,12 @@ func (formats *Formats) load(url string) error {
 		return loader.Load(url, f)
 	}
 	return fmt.Errorf("no `FileLoader` associated with this extension: %q in url %q", ext, url)
+}
+
+// Insert supports inserting pre-loaded data into loaders that support it
+func (formats *Formats) Insert(url string, data interface{}) error {
+	err := formats.insert(url, data)
+	return err
 }
 
 // Load loads the given resource(s) into memory, stopping at the first error.

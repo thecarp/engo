@@ -26,6 +26,21 @@ type imageLoader struct {
 	images map[string]TextureResource
 }
 
+// Insert implements the DataLoader interface to use a pre-loaded image as an Resource
+func (i *imageLoader) Insert(url string, data interface{} ) error {
+	img, ok := data.(image.Image)
+	if ! ok {
+		return fmt.Errorf("Loader requires image.Image. Data type unrecognized.")
+	}
+	b := img.Bounds()
+	newm := image.NewNRGBA(image.Rect(0, 0, b.Dx(), b.Dy()))
+	draw.Draw(newm, newm.Bounds(), img, b.Min, draw.Src)
+
+	i.images[url] = NewTextureResource(&ImageObject{newm})
+
+	return nil
+}
+
 func (i *imageLoader) Load(url string, data io.Reader) error {
 	img, _, err := image.Decode(data)
 	if err != nil {
